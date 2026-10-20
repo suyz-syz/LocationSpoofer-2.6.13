@@ -1,0 +1,81 @@
+name: Build APK from Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'v2.6.13'
+        required: true
+        default: 'v2.6.13'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      # 弃用 android-actions/setup-android（其包目录会去找已被 Google 删除的旧版 tools 组件，
+      # 报 "Failed to find package 'tools'"）。改用 Ubuntu 自带的 ANDROID_HOME + 内置 sdkmanager，
+      # 通过原生 Shell 写死安装所需 SDK 组件并自动接受许可证。
+      - name: Set up Android SDK via native sdkmanager
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          # Ubuntu runner 已通过 ANDROID_HOME 暴露 SDK 根目录
+          SDK_MANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDK_MANAGER" ]; then
+            SDK_MANAGER="$(command -v sdkmanager || true)"
+          fi
+          if [ -z "$SDK_MANAGER" ]; then
+            echo "::error::sdkmanager 不存在，无法安装 Android SDK" && exit 1
+          fi
+
+          # 直接预写已接受的许可证哈希到 $ANDROID_HOME/licenses。
+          # 这是 AGP 触发 SDK 自动下载的前提，且不依赖 sdkmanager 交互式 --licenses 流程
+          # （该流程在 CI 无 TTY 时可能因 Broken pipe 提前退出、漏写许可证）。
+          mkdir -p "$ANDROID_HOME/licenses"
+          printf '%s\n' \
+            "24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$ANDROID_HOME/licenses/android-sdk-license"
+          printf '%s\n' \
+            "84831b9409646a918e30573bab4c9c91346d8abd" \
+            "504667f4c0de7af1a06de9f4b1727b84351f2910" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
+
+          # 安装与 compileSdk=37 对齐的包。API 37 已发布（AGP 报错里明确指向 "37.1"），
+          # platforms;android-37 在 Google 官方仓库存在；用 Bash 数组传参（避免引号污染包名）
+          # + 上面预写的许可证哈希，即可正常拉取安装。
+          SDK_PACKAGES=(
+            "platform-tools"
+            "platforms;android-37"
+            "build-tools;36.0.0"
+            "cmdline-tools;latest"
+          )
+
+          yes | "$SDK_MANAGER" "${SDK_PACKAGES[@]}" >/dev/null 2>&1 || true
+
+          # 确认已装内容（便于排查；个别 sdkmanager 版本不支持该参数可删掉本行）
+          "$SDK_MANAGER" --list_installed 2>/dev/null || true
+
+      - name: Build APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: LocationSpoofer-${{ inputs.tag }}
+          path: |
+            app/build/outputs/apk/**/*.apk
+            **/build/outputs/apk/**/*.apk

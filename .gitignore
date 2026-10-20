@@ -1,0 +1,43 @@
+# ─── Local ───────────────────────────────────────────────
+*.DS_Store
+.idea/
+*.iml
+local.properties
+local.yml
+
+# ─── Gradle ──────────────────────────────────────────────
+.gradle/
+build/
+app/build/
+**/build/
+gradle-wrapper.jar
+
+# ─── NDK ─────────────────────────────────────────────────
+.cxx/
+obj/
+
+# ─── Android / Kotlin ────────────────────────────────────
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.log
+captures/
+*.hprof
+
+# ─── Secrets / Keys ──────────────────────────────────────
+# 不要把 API Key、Keystore 提交进仓库
+*.jks
+*.keystore
+keystore.properties
+google-services.json
+
+# ─── Builds / Outputs ────────────────────────────────────
+app/release/
+
+# Local Gradle user home/cache
+.gradle-home/
+
+# Custom Gradle Home
+.gradle_home/
