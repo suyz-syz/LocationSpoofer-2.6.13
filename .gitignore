@@ -10,7 +10,8 @@ local.yml
 build/
 app/build/
 **/build/
-gradle-wrapper.jar
+# gradle-wrapper.jar 必须提交到仓库，否则云端/新克隆执行 ./gradlew 会报 Unable to access jarfile
+#gradle-wrapper.jar
 
 # ─── NDK ─────────────────────────────────────────────────
 .cxx/
